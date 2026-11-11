@@ -4,7 +4,7 @@ import { KSH, type BetRecord } from "@/lib/shabikia";
 export function BetHistory({ history }: { history: BetRecord[] }) {
   return (
     <section className="glass-card p-4">
-      <h2 className="font-display text-sm font-bold uppercase tracking-[0.2em]">My Demo Bets</h2>
+      <h2 className="font-display text-sm font-bold uppercase tracking-[0.2em]">My Bets</h2>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[380px] text-left text-xs">
           <thead>
@@ -41,7 +41,7 @@ export function BetHistory({ history }: { history: BetRecord[] }) {
         </table>
         {history.length === 0 && (
           <p className="py-3 text-xs text-muted-foreground">
-            No demo bets yet — place one to start your simulated history.
+            No bets yet — place one to start your simulated history.
           </p>
         )}
       </div>

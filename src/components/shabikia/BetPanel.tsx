@@ -153,9 +153,7 @@ export function BetPanel({ game }: { game: CrashGame }) {
           </AnimatePresence>
         </div>
       </div>
-      <p className="mt-3 text-center text-[11px] text-muted-foreground">
-        Virtual balance — demo only. No real money, deposits or withdrawals.
-      </p>
+     
     </div>
   );
 }

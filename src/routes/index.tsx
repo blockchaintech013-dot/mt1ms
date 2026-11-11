@@ -34,21 +34,10 @@ function Index() {
 
   return (
     <div className="min-h-screen">
-      <Navbar balance={game.balance} onReset={game.resetDemo} />
+      <Navbar />
 
       <main className="mx-auto max-w-7xl space-y-4 px-4 py-5">
-        <div className="grid gap-2 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-          <p className="text-xs text-muted-foreground">
-            <span className="font-display font-bold text-primary">DEMO MODE</span> — Shabikia Bet is
-            a simulation. Virtual money only; nothing here is a real wager.
-          </p>
-          <button
-            onClick={game.resetDemo}
-            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 font-display text-xs font-bold uppercase tracking-wider text-foreground transition-colors hover:border-primary hover:text-primary"
-          >
-            <RotateCcw className="size-3.5" /> Reset Demo
-          </button>
-        </div>
+      
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
           <div className="space-y-4">
@@ -62,14 +51,7 @@ function Index() {
                     Cash out before the flight ends
                   </p>
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="font-display text-xs tabular-nums text-muted-foreground">
-                    Round #{roundId(game.roundNumber)}
-                  </p>
-                  <p className="text-[11px] tabular-nums text-muted-foreground">
-                    {game.players.toLocaleString()} Players · {KSH0(game.potBets)} Demo Bets
-                  </p>
-                </div>
+              
               </header>
 
               <div className="mt-4">
@@ -87,11 +69,11 @@ function Index() {
             <section className="glass-card grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Player</p>
-                <p className="font-display text-sm font-bold">You (Demo)</p>
+                <p className="font-display text-sm font-bold">The baddest</p>
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Demo balance
+                  Balance
                 </p>
                 <p className="font-display text-sm font-bold tabular-nums text-success">
                   {KSH(game.balance)}

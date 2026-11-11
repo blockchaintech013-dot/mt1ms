@@ -1,108 +1,302 @@
-import { useState } from "react";
-import { Menu, Plane, RotateCcw, User, X } from "lucide-react";
+
+import { useEffect, useState } from "react";
+import {
+  Plane,
+  User,
+  ChevronDown,
+  LogOut,
+  History,
+  UserRound,
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { supabase } from "@/lib/supabase";
 import { KSH } from "@/lib/shabikia";
+import { AuthModal } from "@/components/AuthModal";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-const LINKS = ["Home", "Aviator", "Games", "Promotions", "How to Play"];
+type Profile = {
+  id: string;
+  balance: number | null;
+};
 
-export function Navbar({ balance, onReset }: { balance: number; onReset: () => void }) {
+type AuthMode = "login" | "register";
+
+export function Navbar() {
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [balanceLoading, setBalanceLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode | null>(null);
+
+  // Fetch only columns permitted by the database.
+  const fetchProfile = async (userId: string) => {
+    setBalanceLoading(true);
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, balance")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("Could not fetch user balance:", error.message);
+      setProfile(null);
+      setBalanceLoading(false);
+      return;
+    }
+
+    setProfile(data as Profile);
+    setBalanceLoading(false);
+  };
+
+  // Load authenticated user and listen for auth changes.
+  useEffect(() => {
+    let mounted = true;
+
+    const loadUser = async (userId: string | null) => {
+      if (!mounted) return;
+
+      if (!userId) {
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase.auth.getUser();
+
+      if (!mounted) return;
+
+      if (error || !data.user || data.user.id !== userId) {
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      setUser(data.user);
+      await fetchProfile(data.user.id);
+
+      if (mounted) {
+        setLoading(false);
+        setAuthMode(null);
+      }
+    };
+
+    // Check existing session.
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      loadUser(data.session?.user.id ?? null);
+    });
+
+    // Listen for login and logout.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const userId = session?.user.id ?? null;
+
+      Promise.resolve().then(() => loadUser(userId));
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Logout.
+  const handleLogout = async () => {
+    setOpen(false);
+
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error("Logout failed:", error.message);
+      return;
+    }
+
+    setUser(null);
+    setProfile(null);
+  };
+
+  const displayName =
+    user?.user_metadata?.username ||
+    user?.phone ||
+    "My Account";
+
+  // Balance display.
+  const balanceDisplay = balanceLoading
+    ? "Loading..."
+    : profile
+      ? profile.balance === null
+        ? "No balance"
+        : KSH(profile.balance)
+      : "Unavailable";
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/70 bg-background/85 backdrop-blur-xl">
-      <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:flex sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[image:var(--gradient-red)] red-glow">
-            <Plane className="size-5 -rotate-45 text-primary-foreground" />
-          </span>
-          <div className="min-w-0">
-            <p className="truncate font-display text-lg font-bold tracking-wide">
-              SHABIKIA <span className="text-primary text-glow">BET</span>
-            </p>
-            <p className="truncate text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              Virtual play only
-            </p>
-          </div>
-        </div>
+    <>
+      <header className="sticky top-0 z-50 border-b border-border/70 bg-background/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
 
-        <nav className="hidden items-center gap-6 lg:flex">
-          {LINKS.map((l) => (
-            <a
-              key={l}
-              href="#game"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {l}
-            </a>
-          ))}
-        </nav>
+          {/* Brand */}
+          <a href="/" className="flex min-w-0 items-center gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[image:var(--gradient-red)] red-glow">
+              <Plane className="size-5 -rotate-45 text-primary-foreground" />
+            </span>
 
-        <div className="flex items-center gap-2">
-          <span className="hidden rounded-full border border-primary/50 bg-primary/10 px-3 py-1 font-display text-[10px] font-bold uppercase tracking-[0.2em] text-primary sm:inline">
-            Demo Mode
-          </span>
-          <div className="hidden rounded-xl border border-border bg-card/70 px-3 py-1.5 text-right sm:block">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Demo Balance
-            </p>
-            <p className="font-display text-sm font-bold text-success">{KSH(balance)}</p>
-          </div>
-          <button
-            onClick={onReset}
-            title="Reset demo"
-            className="hidden size-9 place-items-center rounded-xl border border-border bg-card/70 text-muted-foreground transition-colors hover:text-primary sm:grid"
-          >
-            <RotateCcw className="size-4" />
-          </button>
-          <span className="hidden size-9 place-items-center rounded-xl bg-secondary text-foreground sm:grid">
-            <User className="size-4" />
-          </span>
-          <button
-            onClick={() => setOpen((o) => !o)}
-            aria-label="Toggle menu"
-            className="grid size-9 place-items-center rounded-xl border border-border bg-card/70 lg:hidden"
-          >
-            {open ? <X className="size-4" /> : <Menu className="size-4" />}
-          </button>
-        </div>
-      </div>
+            <div className="min-w-0">
+              <p className="truncate font-display text-lg font-bold tracking-wide">
+                SHABIKIA{" "}
+                <span className="text-primary text-glow">BET</span>
+              </p>
+            </div>
+          </a>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-t border-border/70 lg:hidden"
-          >
-            <div className="space-y-1 px-4 py-3">
-              {LINKS.map((l) => (
-                <a
-                  key={l}
-                  href="#game"
-                  onClick={() => setOpen(false)}
-                  className="block rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
-                >
-                  {l}
-                </a>
-              ))}
-              <div className="flex items-center justify-between rounded-lg bg-secondary px-3 py-2">
-                <span className="text-xs text-muted-foreground">Demo Balance</span>
-                <span className="font-display text-sm font-bold text-success">{KSH(balance)}</span>
-              </div>
+          {/* Authentication loading */}
+          {loading ? (
+            <div className="h-9 w-28 animate-pulse rounded-xl bg-secondary" />
+          ) : !user ? (
+
+            /* Logged-out navigation */
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => {
-                  onReset();
-                  setOpen(false);
-                }}
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground"
+                type="button"
+                onClick={() => setAuthMode("login")}
+                className="rounded-xl border border-border bg-card/70 px-4 py-2 text-sm font-semibold transition-colors hover:bg-secondary"
               >
-                Reset demo
+                Sign In
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAuthMode("register")}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90"
+              >
+                Create Account
               </button>
             </div>
-          </motion.div>
+          ) : (
+
+            /* Authenticated user navigation */
+            <div className="relative flex items-center gap-2">
+
+              {/* Virtual balance */}
+              <div className="hidden rounded-xl border border-border bg-card/70 px-3 py-1.5 text-right sm:block">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Balance
+                </p>
+
+                <p className="font-display text-sm font-bold text-success">
+                  {balanceDisplay}
+                </p>
+              </div>
+
+              {/* User dropdown trigger */}
+              <button
+                type="button"
+                onClick={() => setOpen((value) => !value)}
+                aria-label="Open account menu"
+                aria-expanded={open}
+                className="flex items-center gap-2 rounded-xl border border-border bg-card/70 px-3 py-2 transition-colors hover:bg-secondary"
+              >
+                <span className="grid size-8 place-items-center rounded-lg bg-secondary">
+                  <User className="size-4" />
+                </span>
+
+                <span className="hidden max-w-28 truncate text-sm font-semibold sm:block">
+                  {displayName}
+                </span>
+
+                <ChevronDown className="size-4 text-muted-foreground" />
+              </button>
+
+              {/* Dropdown menu */}
+              <AnimatePresence>
+                {open && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-3 w-64 overflow-hidden rounded-xl border border-border bg-card shadow-xl"
+                  >
+                    <div className="border-b border-border px-4 py-3">
+                      <p className="truncate text-sm font-bold">
+                        {displayName}
+                      </p>
+
+                      <p className="truncate text-xs text-muted-foreground">
+                        {user.phone}
+                      </p>
+
+                      <div className="mt-3 flex items-center justify-between sm:hidden">
+                        <span className="text-xs text-muted-foreground">
+                          Balance
+                        </span>
+
+                        <span className="font-display text-sm font-bold text-success">
+                          {balanceDisplay}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 p-2">
+                      <a
+                        href="/profile"
+                        onClick={() => setOpen(false)}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-secondary"
+                      >
+                        <UserRound className="size-4 text-muted-foreground" />
+                        My Profile
+                      </a>
+
+                      <a
+                        href="/demo-history"
+                        onClick={() => setOpen(false)}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-secondary"
+                      >
+                        <History className="size-4 text-muted-foreground" />
+                        History
+                      </a>
+
+                      <div className="my-1 border-t border-border" />
+
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10"
+                      >
+                        <LogOut className="size-4" />
+                        Logout
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+
+        {/* Close dropdown when clicking outside */}
+        {open && (
+          <button
+            type="button"
+            aria-label="Close account menu"
+            className="fixed inset-0 z-[-1] cursor-default"
+            onClick={() => setOpen(false)}
+          />
         )}
-      </AnimatePresence>
-    </header>
+      </header>
+
+      {/* Authentication modal */}
+      {authMode && (
+        <AuthModal
+          mode={authMode}
+          onClose={() => setAuthMode(null)}
+          onModeChange={setAuthMode}
+        />
+      )}
+    </>
   );
 }
