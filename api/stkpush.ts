@@ -1,16 +1,16 @@
-
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-const PAYWAVE_URL =
-  `${process.env.PAYWAVE_API_URL}/v1/stkpush`;
+const KIPAY_URL = process.env.KIPAY_API_URL;
 
 function normalizePhone(phone: string): string | null {
   let cleaned = phone.replace(/[\s+-]/g, "");
 
   if (cleaned.startsWith("0")) {
     cleaned = "254" + cleaned.substring(1);
-  } else if (cleaned.startsWith("7") ||
-             cleaned.startsWith("1")) {
+  } else if (
+    cleaned.startsWith("7") ||
+    cleaned.startsWith("1")
+  ) {
     cleaned = "254" + cleaned;
   }
 
@@ -25,7 +25,6 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  // Only allow POST requests
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
@@ -34,7 +33,7 @@ export default async function handler(
   }
 
   try {
-    const { phone, amount, reference } = req.body;
+    const { phone, amount, reference } = req.body ?? {};
 
     // Validate required fields
     if (!phone || !amount || !reference) {
@@ -53,11 +52,22 @@ export default async function handler(
     ) {
       return res.status(400).json({
         success: false,
-        message: "Amount must be a whole number greater than zero",
+        message: "Amount must be a valid whole number",
       });
     }
 
-    // Normalize and validate phone number
+    // Validate reference
+    if (
+      typeof reference !== "string" ||
+      reference.length > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment reference",
+      });
+    }
+
+    // Normalize phone number
     const msisdn = normalizePhone(String(phone));
 
     if (!msisdn) {
@@ -67,12 +77,11 @@ export default async function handler(
       });
     }
 
-    // Check API credentials
-    const apiKey = process.env.PAYWAVE_API_KEY;
-    const email = process.env.PAYWAVE_EMAIL;
+    // Check KiPay credentials
+    const apiKey = process.env.KIPAY_API_KEY;
 
-    if (!apiKey || !email || !process.env.PAYWAVE_API_URL) {
-      console.error("Paywave environment variables missing");
+    if (!apiKey || !KIPAY_URL) {
+      console.error("KiPay environment variables missing");
 
       return res.status(500).json({
         success: false,
@@ -80,21 +89,25 @@ export default async function handler(
       });
     }
 
-    // Initiate STK Push
-    const response = await fetch(PAYWAVE_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        api_key: apiKey,
-        email,
-        amount: String(paymentAmount),
-        msisdn,
-        reference: String(reference),
-      }),
-      signal: AbortSignal.timeout(25000),
-    });
+    // Initiate KiPay STK Push
+    const response = await fetch(
+      `${KIPAY_URL}/collections/stk`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({
+          phone: msisdn,
+          amount: paymentAmount,
+          reference,
+          description: "Order payment",
+        }),
+        signal: AbortSignal.timeout(25000),
+      }
+    );
 
     const responseText = await response.text();
 
@@ -107,23 +120,23 @@ export default async function handler(
     }
 
     if (!response.ok) {
-      console.error("Paywave rejected STK request:", result);
+      console.error("KiPay STK request failed:", result);
 
       return res.status(502).json({
         success: false,
-        message: "STK Push request was rejected",
+        message: "KiPay rejected the STK Push request",
         data: result,
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: "STK Push request submitted",
+      message: "STK Push request submitted successfully",
       data: result,
     });
 
   } catch (error) {
-    console.error("STK Push error:", error);
+    console.error("KiPay STK Push error:", error);
 
     return res.status(500).json({
       success: false,
