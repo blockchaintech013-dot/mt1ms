@@ -4,14 +4,16 @@ import {
   Plane,
   User,
   ChevronDown,
+  ArrowDownToLine,
+  ArrowUpFromLine,
   LogOut,
-  History,
   UserRound,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "@/lib/supabase";
 import { KSH } from "@/lib/shabikia";
 import { AuthModal } from "@/components/AuthModal";
+import { WalletTransactionModal } from "@/components/WalletTransactionModal";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 type Profile = {
@@ -20,6 +22,7 @@ type Profile = {
 };
 
 type AuthMode = "login" | "register";
+type TransactionMode = "deposit" | "withdraw";
 
 export function Navbar() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -28,6 +31,8 @@ export function Navbar() {
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode | null>(null);
+  const [transactionMode, setTransactionMode] =
+    useState<TransactionMode | null>(null);
 
   // Fetch only columns permitted by the database.
   const fetchProfile = async (userId: string) => {
@@ -181,7 +186,7 @@ export function Navbar() {
             /* Authenticated user navigation */
             <div className="relative flex items-center gap-2">
 
-              {/* Virtual balance */}
+              {/* Balance */}
               <div className="hidden rounded-xl border border-border bg-card/70 px-3 py-1.5 text-right sm:block">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   Balance
@@ -242,6 +247,8 @@ export function Navbar() {
                     </div>
 
                     <div className="space-y-1 p-2">
+
+                      {/* Profile */}
                       <a
                         href="/profile"
                         onClick={() => setOpen(false)}
@@ -251,17 +258,35 @@ export function Navbar() {
                         My Profile
                       </a>
 
-                      <a
-                        href="/demo-history"
-                        onClick={() => setOpen(false)}
-                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-secondary"
+                      {/* Deposit */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpen(false);
+                          setTransactionMode("deposit");
+                        }}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-secondary"
                       >
-                        <History className="size-4 text-muted-foreground" />
-                        History
-                      </a>
+                        <ArrowDownToLine className="size-4 text-muted-foreground" />
+                        Deposit
+                      </button>
+
+                      {/* Withdraw */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpen(false);
+                          setTransactionMode("withdraw");
+                        }}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-secondary"
+                      >
+                        <ArrowUpFromLine className="size-4 text-muted-foreground" />
+                        Withdraw
+                      </button>
 
                       <div className="my-1 border-t border-border" />
 
+                      {/* Logout */}
                       <button
                         type="button"
                         onClick={handleLogout}
@@ -295,6 +320,19 @@ export function Navbar() {
           mode={authMode}
           onClose={() => setAuthMode(null)}
           onModeChange={setAuthMode}
+        />
+      )}
+
+      {/* Deposit / Withdraw Modal */}
+      {transactionMode && (
+        <WalletTransactionModal
+          mode={transactionMode}
+          onClose={() => setTransactionMode(null)}
+          onSuccess={() => {
+            if (user) {
+              fetchProfile(user.id);
+            }
+          }}
         />
       )}
     </>

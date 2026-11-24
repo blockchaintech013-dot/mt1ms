@@ -66,7 +66,7 @@ export const drawCrashPoint = () => {
   const r = Math.random();
   if (r < 0.04) return 1.0;
   const value = 0.98 / (1 - r);
-  return Math.min(Math.round(value * 100) / 100, 42);
+  return Math.min(Math.round(value * 100) / 100, 700);
 };
 
 export const roundId = (n: number) => `SHB-${n}`;
