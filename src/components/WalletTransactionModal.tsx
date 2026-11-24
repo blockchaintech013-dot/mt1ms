@@ -34,12 +34,16 @@ export function WalletTransactionModal({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Normalize Kenyan phone numbers
   const normalizePhone = (value: string) => {
     let cleaned = value.replace(/\D/g, "");
 
     if (cleaned.startsWith("0")) {
       cleaned = "254" + cleaned.slice(1);
-    } else if (cleaned.startsWith("7") || cleaned.startsWith("1")) {
+    } else if (
+      cleaned.startsWith("7") ||
+      cleaned.startsWith("1")
+    ) {
       cleaned = "254" + cleaned;
     }
 
@@ -55,6 +59,7 @@ export function WalletTransactionModal({
     const numericAmount = Number(amount);
     const normalizedPhone = normalizePhone(phone);
 
+    // Validate amount
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       setError("Enter a valid amount.");
       return;
@@ -65,6 +70,7 @@ export function WalletTransactionModal({
       return;
     }
 
+    // Validate phone
     if (!/^254[17]\d{8}$/.test(normalizedPhone)) {
       setError("Enter a valid Kenyan phone number.");
       return;
@@ -73,23 +79,30 @@ export function WalletTransactionModal({
     setSubmitting(true);
 
     try {
+      // Get authenticated Supabase session
       const {
         data: { session },
         error: sessionError,
       } = await supabase.auth.getSession();
 
       if (sessionError || !session) {
-        throw new Error("Your session has expired. Please sign in again.");
+        throw new Error(
+          "Your session has expired. Please sign in again."
+        );
       }
 
+      // Generate unique transaction reference
       const reference = `${
         isDeposit ? "DEP" : "WTH"
       }-${crypto.randomUUID()}`;
 
+      // Paywave STK Push endpoint.
+      // B2C endpoint remains unchanged.
       const endpoint = isDeposit
-        ? "/api/payments/stk-push"
+        ? "/api/stkpush"
         : "/api/payments/b2c";
 
+      // Send payment request
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
@@ -100,29 +113,50 @@ export function WalletTransactionModal({
           phone: normalizedPhone,
           amount: numericAmount,
           reference,
-          description: isDeposit
-            ? "Wallet deposit"
-            : "Wallet withdrawal",
         }),
       });
 
-      const result = await response.json();
+      // Safely parse API response
+      const responseText = await response.text();
 
-      if (!response.ok || result.status === false || result.success === false) {
+      let result: any;
+
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        throw new Error(
+          "Invalid response from payment server. Please try again."
+        );
+      }
+
+      // Handle API and Paywave errors
+      if (
+        !response.ok ||
+        result.status === false ||
+        result.success === false
+      ) {
         throw new Error(
           result.detail ||
           result.message ||
           result.error ||
-          "Transaction request failed. Please try again."
+          "Payment request failed. Please try again."
         );
       }
 
-      setSuccess(
-        result.detail ||
-        (isDeposit
-          ? "STK push sent. Enter your M-Pesa PIN to complete the payment."
-          : "Your withdrawal request has been submitted and is being processed.")
-      );
+      // STK Push accepted
+      if (isDeposit) {
+        setSuccess(
+          result.message ||
+          result.detail ||
+          "Paywave STK Push request submitted. Check your phone and enter your M-Pesa PIN to complete the payment."
+        );
+      } else {
+        setSuccess(
+          result.message ||
+          result.detail ||
+          "Your withdrawal request has been submitted and is being processed."
+        );
+      }
 
       onSuccess?.();
 
@@ -313,7 +347,9 @@ export function WalletTransactionModal({
                       ? <ArrowDownToLine className="size-4" />
                       : <ArrowUpFromLine className="size-4" />}
 
-                    {isDeposit ? "Continue to M-Pesa" : "Request Withdrawal"}
+                    {isDeposit
+                      ? "Continue to M-Pesa"
+                      : "Request Withdrawal"}
                   </>
                 )}
               </button>
@@ -330,7 +366,9 @@ export function WalletTransactionModal({
             {/* Footer */}
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <Wallet className="size-3.5" />
-              <span>Secure payments powered by SasaPay</span>
+              <span>
+                Secure payments powered by Paywave Express
+              </span>
             </div>
           </form>
         </motion.div>
